@@ -46,7 +46,6 @@ Restart DSH. No configuration, no toggles.
 | Entry point | Purpose |
 |---|---|
 | `/contract` | Latest receipt, commitments still in force, lifetime survival rate |
-| `contract_report` tool | Lets the agent ask what it lost — useful right after a compaction |
 
 ## What counts as a requirement
 
@@ -82,10 +81,14 @@ identifiers, character-bigram overlap for Chinese, averaged. No model calls, no 
 ## Development
 
 ```sh
-npm test    # 17 cases, including an end-to-end simulation
+npm test    # 16 cases, including an end-to-end simulation
 ```
 
 Zero dependencies, zero build step: the ESM in `lib/` is the published artifact.
+
+> Why no imports at all: `@deepseek-ai/*` runtime packages exist only inside the DSH install,
+> not in a profile, and DSH registers no ESM resolve hook. Any third-party plugin that imports them
+> fails with `ERR_MODULE_NOT_FOUND` on a user's machine. This plugin therefore uses `ctx` only.
 
 ## License
 

@@ -45,12 +45,11 @@ const compaction = (seq, summary, shadowedSeqs) => ({
   },
 })
 
-test('registers a command and a tool', () => {
+test('registers the contract command', () => {
   const h = harness()
   assert.equal(name, 'compact-receipt')
-  assert.ok(inject.includes('commands'))
+  assert.deepEqual(inject, ['commands'])
   assert.ok(h.commands.has('contract'))
-  assert.ok(h.tools.has('contract_report'))
 })
 
 test('end to end: a dropped requirement shows up as possibly lost', async () => {
@@ -76,14 +75,6 @@ test('end to end: a preserved requirement is not reported as lost', async () => 
   const answer = await h.commands.get('contract').handler({ agent: { session } })
   assert.match(answer.text, /疑似失落 0/)
   assert.match(answer.text, /存活 2/)
-})
-
-test('the agent-facing tool returns the same report', async () => {
-  const h = harness()
-  const session = sessionFor('sess-4')
-  h.send('session/event', session, userMessage(2, '必须保留 API 兼容'))
-  const result = await h.tools.get('contract_report').execute({}, { agent: { session }, signal: AbortSignal.timeout(1000) })
-  assert.match(result.text, /API/)
 })
 
 test('ignores synthetic messages that are not from the human', async () => {

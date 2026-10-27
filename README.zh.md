@@ -43,7 +43,6 @@ dsh plugin --profile web add github:cty-09/dsh-compact-receipt
 | 入口 | 用途 |
 |---|---|
 | `/contract` | 看最近一次压缩的收据、仍在生效的契约、累计存活率 |
-| `contract_report` 工具 | 让 agent 自己查「我丢了什么」，适合压缩刚发生之后调用 |
 
 ## 它认哪些「要求」
 
@@ -77,10 +76,12 @@ DSH 在压缩时写入 `compaction/summary` 事件，其中带有摘要正文和
 ## 开发
 
 ```sh
-npm test    # 17 个用例，含端到端模拟
+npm test    # 16 个用例，含端到端模拟
 ```
 
 零依赖、零构建步骤：`lib/` 里的 ESM 就是发布物。
+
+> 为什么一个 import 都没有：`@deepseek-ai/*` 运行时包只存在于 DSH 安装目录，profile 里没有，DSH 也不注册 ESM 解析钩子。第三方插件只要 `import` 它们，在用户机器上就会 `ERR_MODULE_NOT_FOUND`。所以这里只用 `ctx`，不引入任何宿主包。
 
 ## License
 
