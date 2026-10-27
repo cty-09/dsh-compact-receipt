@@ -51,6 +51,8 @@ Restart DSH. No configuration, no toggles.
 
 ## Architecture (v0.3)
 
+- **Semantic classification**: one batched call over the shadowed messages adds the phrasings the rules
+  miss ("tests 目录先别碰") to the commitment table - this is what moves coverage from rules to the model.
 - **Semantic judgement**: commitments plus the new summary go to the model in one call that
   returns kept/lost/unclear. If it cannot answer, the rule scorer runs and the receipt says so.
 - **Delivery is verified**: an injected message echoes back as a `user/message` event; the receipt

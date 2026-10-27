@@ -56,3 +56,33 @@ test.skip('a model verdict covers a commitment the rules cannot extract', async 
   assert.match(answer.text, /语义判定/)
   assert.match(answer.text, /还没有发生过压缩|契约 0 条/)
 })
+
+test('classification catches a phrasing the rules miss, then the judge scores it', async () => {
+  const injected = []
+  const agentLike = {
+    options: { provider: 'deepseek', model: 'deepseek-chat' },
+    session: { id: 'sess-cls' },
+    inject: (m) => injected.push(m),
+  }
+  const listeners = []
+  const commands = new Map()
+  let guards
+  const router = (options) => (options.system.toLowerCase().includes('label user messages')
+    ? '{"items":[{"id":7,"label":"constraint"}]}'
+    : '{"verdicts":[{"id":1,"verdict":"lost","why":"summary never mentions tests"}]}')
+  apply({
+    on: (t, fn) => listeners.push({ t, fn }),
+    commands: { register: (d) => { commands.set(d.name, d); return () => {} } },
+    tools: { guard: (fn) => { guards = fn; return () => {} } },
+    llm: { stream: (options) => (async function* () { yield { type: 'text-delta', text: router(options) } })() },
+  })
+  // Publish the agent the way the surface does: through the guard.
+  guards({ name: 'read', arguments: { path: 'a.ts' }, agent: agentLike })
+  const send = (ev) => { for (const l of listeners) if (l.t === 'session/event') l.fn(agentLike.session, ev) }
+  send({ type: 'user/message', seq: 7, time: 1, data: { role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: 'tests 目录先别碰' }] } })
+  send({ type: 'compaction/summary', seq: 8, time: 2, data: { compactionId: 'c', summary: [{ type: 'text', text: '用户要求修改代码。' }], shadowedSeqs: [7], shadowedTokenCount: 50 } })
+  await new Promise((r) => setTimeout(r, 20))
+  const answer = await commands.get('contract').handler({ agent: agentLike, rawInput: '' })
+  assert.match(answer.text, /tests 目录先别碰/)
+  assert.match(answer.text, /语义判定/)
+})
