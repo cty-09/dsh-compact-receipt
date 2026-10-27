@@ -156,3 +156,26 @@ test('probe reports what a pinned policy would keep, without changing anything',
   assert.match(answer.text, /不要改 tests/)
   assert.match(answer.text, /只读探测/)
 })
+
+test('a successful injection is confirmed by its echo on the event stream', async () => {
+  const h = harness()
+  const session = sessionFor('sess-deliver')
+  h.send('session/event', session, userMessage(2, '不要改 tests/ 目录'))
+  const agent = { session, inject(message) { h.injected.push(message) } }
+  h.guards[0](writeCall(h, 'sess-deliver', { path: 'src/app.ts' }))
+  h.send('session/event', session, compaction(3, '用户要求修改部分代码。', [2]))
+  assert.equal(h.injected.length, 1)
+  const injectedId = h.injected[0].id
+  assert.match(injectedId, /^compact-receipt-/)
+
+  const before = await h.commands.get('contract').handler({ agent, rawInput: '' })
+  assert.match(before.text, /补回待确认/)
+
+  // The host echoes the injected message back through session/event.
+  h.send('session/event', session, {
+    seq: 4, time: 5, type: 'user/message',
+    data: { role: 'user', id: injectedId, source: { kind: 'user' }, content: h.injected[0].content },
+  })
+  const after = await h.commands.get('contract').handler({ agent, rawInput: '' })
+  assert.match(after.text, /已补回并确认到达/)
+})
