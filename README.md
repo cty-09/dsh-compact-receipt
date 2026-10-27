@@ -57,6 +57,10 @@ Restart DSH. No configuration, no toggles.
   only claims "confirmed delivered" when that echo arrives. A successful write is not delivery.
 - **Classification probe**: `/contract probe` measures what a pinned policy would keep and how much
   context it would cost, without changing anything.
+- **Rule-layer accuracy is measured, not asserted**: `test/corpus.js` holds 21 labelled messages and
+  `npm test` prints the score. Today the rules reach **86%** (100% precision on constraints, decisions
+  and acceptance; 70% constraint recall) - postposed negations like "tests 目录先别碰" are the misses,
+  and the semantic layer covers them.
 
 ## It also does two more things
 
