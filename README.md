@@ -1,5 +1,16 @@
 # dsh-compact-receipt
 
+> ## ⚠️ Beta (0.4.0-beta.1)
+>
+> **A default install is safe**: it records, audits and guards; it does not change compaction.
+>
+> **The compaction takeover is experimental and has not been exercised by a real compaction yet.**
+> Two end-to-end runs never triggered compaction (likely `auto` not enabled or a threshold floor),
+> so the pinned block has never been produced in a live session - only unit-tested.
+>
+> The takeover is off by default and requires both `engine: true` and disabling the `compaction-basic`
+> row. Until a real compaction verifies it, **do not use it on important sessions**.
+
 [中文](README.zh.md) | English
 
 > Long conversations don't forget. Nobody tells you when they started.
