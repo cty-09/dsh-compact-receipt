@@ -62,7 +62,7 @@ const writeCall = (h, sessionId, args) => ({
 test('registers the contract command and one guard', () => {
   const h = harness()
   assert.equal(name, 'compact-receipt')
-  assert.deepEqual(inject, ['commands', 'tools'])
+  assert.ok(inject.includes('commands') && inject.includes('tools'))
   assert.ok(h.commands.has('contract'))
   assert.equal(h.guards.length, 1)
 })

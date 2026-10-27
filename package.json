@@ -3,13 +3,13 @@
   "version": "0.3.0",
   "description": "Compaction receipts for DeepSeek Harness: after every context compaction, see which of your requirements the summary dropped. 上下文压缩收据：审计这次压缩吃掉了你哪几条要求。",
   "type": "module",
-  "main": "lib/index.js",
+  "main": "dist/index.js",
   "exports": {
-    ".": "./lib/index.js",
+    ".": "./dist/index.js",
     "./package.json": "./package.json"
   },
   "files": [
-    "lib",
+    "dist",
     "cordis.patch.yml",
     "README.md",
     "README.zh.md",
@@ -32,7 +32,9 @@
   },
   "homepage": "https://github.com/cty-09/dsh-compact-receipt",
   "scripts": {
-    "test": "node --test test/*.test.js"
+    "build": "esbuild lib/index.js --bundle --format=esm --platform=node --outfile=dist/index.js",
+    "test": "node --test test/*.test.js",
+    "prepack": "npm run build"
   },
   "engines": {
     "dsh": ">=0.2.0-rc.2"
@@ -41,5 +43,9 @@
     "bundle": {
       "patch": "./cordis.patch.yml"
     }
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-compaction-basic": "^0.2.1-rc.2",
+    "esbuild": "^0.25.9"
   }
 }
