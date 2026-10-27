@@ -138,3 +138,21 @@ test('ignores synthetic messages that are not from the human', async () => {
   const answer = await h.commands.get('contract').handler({ agent: { session }, rawInput: '' })
   assert.match(answer.text, /还没有发生过压缩/)
 })
+
+test('probe reports what a pinned policy would keep, without changing anything', async () => {
+  const h = harness()
+  const session = sessionFor('sess-probe')
+  const turn = (n) => h.send('session/event', session, { type: 'turn/start', seq: n, time: n, data: { turn: n } })
+  turn(1)
+  h.send('session/event', session, userMessage(10, '帮我看看这个项目的结构'))
+  h.send('session/event', session, userMessage(11, '不要改 tests/ 目录下的任何文件'))
+  h.send('session/event', session, userMessage(12, '好的谢谢，辛苦了'))
+  h.send('session/event', session, userMessage(13, '我们决定采用 pnpm 作为包管理器'))
+  h.send('session/event', session, compaction(20, '用户查看了项目结构，并确认使用 pnpm。', [10, 11, 12, 13]))
+
+  const answer = await h.commands.get('contract').handler({ agent: { session }, rawInput: 'probe' })
+  assert.match(answer.text, /扫描 4 条/)
+  assert.match(answer.text, /会被钉住 2 条/)
+  assert.match(answer.text, /不要改 tests/)
+  assert.match(answer.text, /只读探测/)
+})
