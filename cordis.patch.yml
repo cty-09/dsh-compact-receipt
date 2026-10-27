@@ -1,0 +1,3 @@
+- insert:
+    - id: compact-receipt
+      name: 'dsh-compact-receipt'
