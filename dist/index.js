@@ -7483,7 +7483,8 @@ function runCommand(state, rawInput) {
 function apply(ctx, config = {}) {
   if (config.engine === true) {
     const PinnedEngine = createPinnedEngine(ctx, config, (sessionId) => stateOf(sessionId).commitments.filter((c) => c.status === "active" || c.status === "survived"));
-    new PinnedEngine(ctx, config);
+    const { engine: _engine, ...engineConfig } = config;
+    new PinnedEngine(ctx, engineConfig);
   }
   ctx.on("session/event", (session, event) => {
     if (event.type === "turn/start") {
