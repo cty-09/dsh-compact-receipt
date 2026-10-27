@@ -6,16 +6,18 @@ import { apply, name, inject } from '../lib/index.js'
 function harness() {
   const listeners = []
   const commands = new Map()
-  const tools = new Map()
+  const guards = []
+  const injected = []
   const ctx = {
     on(type, fn) { listeners.push({ type, fn }) },
     commands: { register(def) { commands.set(def.name, def); return () => {} } },
-    tools: { register(def) { tools.set(def.name, def); return () => {} } },
+    tools: { guard(fn) { guards.push(fn); return () => {} } },
   }
   apply(ctx)
   return {
     commands,
-    tools,
+    guards,
+    injected,
     send(type, session, event) {
       for (const l of listeners) if (l.type === type) l.fn(session, event)
     },
@@ -23,13 +25,21 @@ function harness() {
 }
 
 const sessionFor = (id) => ({ id })
-const session = sessionFor('sess-1')
-const userMessage = (seq, text) => ({
+
+function fakeAgent(id, sink) {
+  return {
+    session: { id },
+    inject(message) { sink.push(message) },
+  }
+}
+
+const userMessage = (seq, text, kind = 'user') => ({
   seq,
   time: 1_700_000_000_000,
   type: 'user/message',
-  data: { role: 'user', id: `m${seq}`, source: { kind: 'user' }, content: [{ type: 'text', text }] },
+  data: { role: 'user', id: `m${seq}`, source: { kind }, content: [{ type: 'text', text }] },
 })
+
 const compaction = (seq, summary, shadowedSeqs) => ({
   seq,
   time: 1_700_000_100_000,
@@ -40,50 +50,91 @@ const compaction = (seq, summary, shadowedSeqs) => ({
     shadowedSeqs,
     shadowedRange: { start: shadowedSeqs[0], end: shadowedSeqs[shadowedSeqs.length - 1] },
     shadowedTokenCount: 8200,
-    provider: 'deepseek',
-    model: 'deepseek-chat',
   },
 })
 
-test('registers the contract command', () => {
+const writeCall = (h, sessionId, args) => ({
+  name: 'write',
+  arguments: args,
+  agent: { session: { id: sessionId }, inject(message) { h.injected.push(message) } },
+})
+
+test('registers the contract command and one guard', () => {
   const h = harness()
   assert.equal(name, 'compact-receipt')
-  assert.deepEqual(inject, ['commands'])
+  assert.deepEqual(inject, ['commands', 'tools'])
   assert.ok(h.commands.has('contract'))
+  assert.equal(h.guards.length, 1)
 })
 
-test('end to end: a dropped requirement shows up as possibly lost', async () => {
+test('a dropped requirement is reported and announced in the chat', async () => {
   const h = harness()
+  const session = sessionFor('sess-a')
   h.send('session/event', session, { type: 'turn/start', seq: 1, time: 1, data: { turn: 3 } })
   h.send('session/event', session, userMessage(2, '不要改 tests/ 目录，用 pnpm 不要用 npm'))
+  // The guard is what publishes the agent to the plugin.
+  h.guards[0](writeCall(h, 'sess-a', { path: 'src/app.ts' }))
   h.send('session/event', session, compaction(3, '用户要求使用 pnpm 完成工作。', [2]))
 
-  const answer = await h.commands.get('contract').handler({ agent: { session } })
-  assert.equal(answer.kind, 'success')
+  const answer = await h.commands.get('contract').handler({ agent: { session }, rawInput: '' })
   assert.match(answer.text, /疑似失落/)
   assert.match(answer.text, /tests/)
-  assert.match(answer.text, /吃掉 1 条历史/)
+  assert.equal(h.injected.length, 1)
+  assert.match(h.injected[0].content[0].text, /压缩收据/)
+  assert.match(h.injected[0].content[0].text, /tests/)
 })
 
-test('end to end: a preserved requirement is not reported as lost', async () => {
+test('a preserved requirement produces no notice', () => {
   const h = harness()
-  const session = sessionFor('sess-3')
-  h.send('session/event', session, { type: 'turn/start', seq: 1, time: 1, data: { turn: 1 } })
+  const session = sessionFor('sess-b')
   h.send('session/event', session, userMessage(2, '用 pnpm 不要用 npm'))
+  h.guards[0](writeCall(h, 'sess-b', { path: 'src/app.ts' }))
   h.send('session/event', session, compaction(3, '用户要求不要用 npm，改用 pnpm。', [2]))
+  assert.equal(h.injected.length, 0)
+})
 
-  const answer = await h.commands.get('contract').handler({ agent: { session } })
-  assert.match(answer.text, /疑似失落 0/)
-  assert.match(answer.text, /存活 2/)
+test('the guard blocks a write against a recorded prohibition', () => {
+  const h = harness()
+  const session = sessionFor('sess-c')
+  h.send('session/event', session, userMessage(2, '不要改 tests/ 目录'))
+  const denial = h.guards[0](writeCall(h, 'sess-c', { path: 'tests/unit/app.test.ts' }))
+  assert.ok(typeof denial === 'string')
+  assert.match(denial, /Blocked by compact-receipt/)
+  assert.match(denial, /unblock/)
+})
+
+test('the guard allows unrelated paths and non-write tools', () => {
+  const h = harness()
+  const session = sessionFor('sess-d')
+  h.send('session/event', session, userMessage(2, '不要改 tests/ 目录'))
+  assert.equal(h.guards[0](writeCall(h, 'sess-d', { path: 'src/app.ts' })), undefined)
+  assert.equal(h.guards[0]({ name: 'read', arguments: { path: 'tests/a.ts' }, agent: { session } }), undefined)
+})
+
+test('/contract unblock lifts a specific rule', async () => {
+  const h = harness()
+  const session = sessionFor('sess-e')
+  h.send('session/event', session, userMessage(2, '不要改 tests/ 目录'))
+  const blocked = h.guards[0](writeCall(h, 'sess-e', { path: 'tests/a.ts' }))
+  assert.ok(blocked)
+  const id = Number(blocked.match(/#(\d+)/)[1])
+  await h.commands.get('contract').handler({ agent: { session }, rawInput: `unblock ${id}` })
+  assert.equal(h.guards[0](writeCall(h, 'sess-e', { path: 'tests/a.ts' })), undefined)
+})
+
+test('/contract guard off disables blocking', async () => {
+  const h = harness()
+  const session = sessionFor('sess-f')
+  h.send('session/event', session, userMessage(2, '不要改 tests/ 目录'))
+  await h.commands.get('contract').handler({ agent: { session }, rawInput: 'guard off' })
+  assert.equal(h.guards[0](writeCall(h, 'sess-f', { path: 'tests/a.ts' })), undefined)
 })
 
 test('ignores synthetic messages that are not from the human', async () => {
   const h = harness()
-  const session = sessionFor('sess-5')
-  const synthetic = userMessage(5, '不要改 tests/')
-  synthetic.data.source = { kind: 'model' }
-  h.send('session/event', session, synthetic)
+  const session = sessionFor('sess-g')
+  h.send('session/event', session, userMessage(5, '不要改 tests/', 'model'))
   h.send('session/event', session, compaction(6, '无关摘要', [5]))
-  const answer = await h.commands.get('contract').handler({ agent: { session } })
+  const answer = await h.commands.get('contract').handler({ agent: { session }, rawInput: '' })
   assert.match(answer.text, /还没有发生过压缩/)
 })

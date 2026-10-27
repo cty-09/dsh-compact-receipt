@@ -43,9 +43,22 @@ Restart DSH. No configuration, no toggles.
 
 ## Usage
 
-| Entry point | Purpose |
+| Command | Purpose |
 |---|---|
 | `/contract` | Latest receipt, commitments still in force, lifetime survival rate |
+| `/contract guard off` | Disable blocking (on by default) |
+| `/contract unblock <id>` | Lift one rule |
+
+## It also does two more things
+
+**1. It tells you inside the conversation.** When a compaction drops requirements, a receipt card appears
+in the chat — visible in the Web UI without remembering any command. That card also hands the dropped
+requirements back to the model, so it is both an alert and the cheapest possible repair.
+
+**2. It blocks contradicting writes.** Once "don't touch X" is recorded, a write-family tool call targeting
+`X` is denied, with a message telling the agent to confirm with you first, or you to run
+`/contract unblock <id>`. Only file-writing tools are covered, and matching is path-string based:
+missing a block is preferable to a false block.
 
 ## What counts as a requirement
 
@@ -69,7 +82,12 @@ This plugin does not pretend to be smarter than it is:
    they were never dropped.
 3. **Rule extraction misses things.** It recognizes common imperative phrasing and nothing else. It
    does not guess.
-4. **It does not prevent compaction and cannot restore the original text.** It makes the loss visible.
+4. **It does not prevent compaction and cannot restore the original text.** It makes the loss visible and
+   puts the dropped requirements back in front of the model.
+5. **Blocking is path-string matching.** Only file-writing tool arguments are inspected; a different spelling
+   of the same path (symlink, relative form) can slip through.
+6. **The card costs tokens.** It only appears when something was actually lost — typically 4-6 lines, far
+   less than the loss it prevents.
 
 ## How it works
 
@@ -81,7 +99,7 @@ identifiers, character-bigram overlap for Chinese, averaged. No model calls, no 
 ## Development
 
 ```sh
-npm test    # 16 cases, including an end-to-end simulation
+npm test    # 20 cases, including an end-to-end simulation
 ```
 
 Zero dependencies, zero build step: the ESM in `lib/` is the published artifact.

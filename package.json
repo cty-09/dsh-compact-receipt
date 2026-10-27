@@ -1,6 +1,6 @@
 {
   "name": "dsh-compact-receipt",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Compaction receipts for DeepSeek Harness: after every context compaction, see which of your requirements the summary dropped. 上下文压缩收据：审计这次压缩吃掉了你哪几条要求。",
   "type": "module",
   "main": "lib/index.js",
