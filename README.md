@@ -49,6 +49,15 @@ Restart DSH. No configuration, no toggles.
 | `/contract guard off` | Disable blocking (on by default) |
 | `/contract unblock <id>` | Lift one rule |
 
+## Architecture (v0.3)
+
+- **Semantic judgement**: commitments plus the new summary go to the model in one call that
+  returns kept/lost/unclear. If it cannot answer, the rule scorer runs and the receipt says so.
+- **Delivery is verified**: an injected message echoes back as a `user/message` event; the receipt
+  only claims "confirmed delivered" when that echo arrives. A successful write is not delivery.
+- **Classification probe**: `/contract probe` measures what a pinned policy would keep and how much
+  context it would cost, without changing anything.
+
 ## It also does two more things
 
 **1. It tells you inside the conversation.** When a compaction drops requirements, a receipt card appears
@@ -86,7 +95,14 @@ This plugin does not pretend to be smarter than it is:
    puts the dropped requirements back in front of the model.
 5. **Blocking is path-string matching.** Only file-writing tool arguments are inspected; a different spelling
    of the same path (symlink, relative form) can slip through.
-6. **The card costs tokens.** It only appears when something was actually lost — typically 4-6 lines, far
+6. **No dedicated sidebar panel.** A client plugin needs the custom `window.__ModuleLoader__` bundle
+   format, `ctx.slots`, and a React build; this version does not ship one. Visibility comes from the
+   in-conversation card and `/contract`.
+7. **It does not take over the compactor.** Replacing `CompactionEngine` means reimplementing
+   summarisation, range selection and checkpoint writes, reachable only from a long live session and
+   not verifiable offline. This version guarantees at the compaction boundary (re-inject + echo
+   confirmation) instead of replacing the engine.
+8. **The card costs tokens.** It only appears when something was actually lost — typically 4-6 lines, far
    less than the loss it prevents.
 
 ## How it works
