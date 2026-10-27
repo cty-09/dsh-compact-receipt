@@ -1,8 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { probeCompaction, estimateTokens } from '../lib/probe.js'
+import { extractCommitments } from '../lib/extract.js'
 
-const extract = (text) => (/不要|别|必须/.test(text) ? [{ kind: 'constraint' }] : [])
+// Use the real extractor: a `/别/` shortcut matches “别的” and turns chatter into constraints.
+const extract = (text) => extractCommitments(text)
 
 test('estimates CJK and latin tokens', () => {
   assert.equal(estimateTokens('不要改'), 3)
